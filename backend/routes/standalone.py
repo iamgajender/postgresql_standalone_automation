@@ -37,6 +37,7 @@ standalone_bp = Blueprint(
 # Ansible Configuration
 
 ANSIBLE_PLAYBOOK = "/usr/bin/ansible-playbook"
+ANSIBLE_BIN = "/usr/bin/ansible"
 ANSIBLE_PROJECT = str(ANSIBLE_DIR)
 
 
@@ -77,6 +78,72 @@ def run_playbook_live(playbook_name, label):
 
     ansible_logger.info(f"{label} finished with return code {returncode}")
     return returncode
+
+
+@standalone_bp.route("/install-test-connection", methods=["POST"])
+def install_test_connection():
+    """
+    Pre-flight check before a real install — runs Ansible's ping module
+    (real SSH connect + auth + Python-interpreter check) against exactly
+    the IP/credentials about to be used, so a bad IP, closed port 22, or
+    wrong password shows up in seconds instead of after however long the
+    install runs before hitting the same wall.
+
+    Self-contained ad-hoc inventory ("-i <ip>,") — doesn't touch or
+    depend on the real inventory.ini that /install generates.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "Request body is empty."}), 400
+
+        server_ip = data.get("server_ip")
+        ssh_user = data.get("ssh_user")
+        ssh_password = data.get("ssh_password")
+
+        missing = [f for f, v in [("server_ip", server_ip), ("ssh_user", ssh_user), ("ssh_password", ssh_password)] if not v]
+        if missing:
+            return jsonify({
+                "status": "error",
+                "message": f"Missing required fields: {', '.join(missing)}"
+            }), 400
+
+        result = subprocess.run(
+            [
+                ANSIBLE_BIN,
+                "-i", f"{server_ip},",
+                "all", "-m", "ping",
+                "-u", ssh_user,
+                "-e", f"ansible_ssh_pass={ssh_password}",
+                "-e", "ansible_ssh_common_args='-o StrictHostKeyChecking=no'",
+                "-e", "ansible_python_interpreter=/usr/bin/python3",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env={**os.environ, "ANSIBLE_FORCE_COLOR": "False"}
+        )
+
+        output = (result.stdout or "") + (("\n" + result.stderr) if result.stderr else "")
+        reachable = result.returncode == 0
+
+        return jsonify({
+            "status": "success" if reachable else "error",
+            "message": (
+                "Server reachable — SSH auth and Python interpreter OK."
+                if reachable else
+                "Could not reach the server — see output below."
+            ),
+            "output": output
+        }), 200
+
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "status": "error",
+            "message": "Connectivity check timed out after 20s — the server may be unreachable or firewalled."
+        }), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @standalone_bp.route("/install", methods=["POST"])
