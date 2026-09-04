@@ -1,8 +1,13 @@
 import os
 
 
-INVENTORY_FILE = "/opt/pg_sa/pg_an/inventory/inventory.ini"
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+INVENTORY_FILE = str(
+    BASE_DIR / "pg_an" / "inventory" / "inventory.ini"
+)
 
 def generate_inventory(server_ip, ssh_user, ssh_password):
 
