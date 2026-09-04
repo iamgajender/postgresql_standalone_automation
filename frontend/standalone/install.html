@@ -44,7 +44,7 @@
             </a>
         </li>
         <li>
-            <a href="#">
+            <a href="../high-availability/index.html">
                 <i class="fa-solid fa-network-wired"></i>
                 High Availability
             </a>
@@ -60,6 +60,21 @@
             Administrator
         </div>
     </header>
+
+    <div class="result-panel" style="background:rgba(198,48,62,0.06); border-color:rgba(198,48,62,0.3);">
+        <h3 style="color:var(--signal-red);">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Before you install
+        </h3>
+        <p class="field-hint" style="font-size:0.85rem;">
+            Passwordless (key-based) SSH access from this Ansible controller to the target server is
+            <strong>recommended</strong> — it's more reliable than password auth and avoids credentials
+            sitting in a form. A password still works if keys aren't set up yet. Either way, use
+            <strong>Test Connectivity</strong> below to confirm the server is reachable before installing —
+            it catches a wrong IP, closed port 22, or bad password in seconds instead of after however long
+            the install runs before hitting the same problem.
+        </p>
+    </div>
 
     <div class="result-panel">
         <h3>Server Details</h3>
@@ -137,10 +152,18 @@
                 Passwords do not match.
             </p>
 
-            <button type="submit" class="btn btn-primary" id="install-btn">
-                <i class="fa-solid fa-download"></i>
-                Install PostgreSQL
-            </button>
+            <div id="connectivity-status" class="connection-status" hidden style="white-space:pre-wrap; font-family:var(--font-mono); font-size:0.8125rem;"></div>
+
+            <div class="result-actions">
+                <button type="button" class="btn btn-outline" id="test-connectivity-btn" onclick="testInstallConnectivity()">
+                    <i class="fa-solid fa-plug-circle-check"></i>
+                    Test Connectivity
+                </button>
+                <button type="submit" class="btn btn-primary" id="install-btn">
+                    <i class="fa-solid fa-download"></i>
+                    Install PostgreSQL
+                </button>
+            </div>
         </form>
     </div>
 

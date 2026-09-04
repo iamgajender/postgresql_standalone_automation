@@ -4,6 +4,78 @@ function escapeHtml(value) {
     return div.innerHTML;
 }
 
+// Same per-host coloring approach as the High Availability page's
+// connectivity test — Ansible's "-m ping" output has one block per host
+// starting with "IP | SUCCESS =>" or "IP | UNREACHABLE! =>". Coloring the
+// whole block by overall pass/fail would make a successful host's own
+// line render in red just because something else in the run failed, so
+// this colors each host's block independently instead.
+function formatPingOutput(rawOutput) {
+    if (!rawOutput.trim()) return "";
+
+    const hostBlockPattern = /^(\S+)\s\|\s(SUCCESS|UNREACHABLE!|FAILED!)/;
+    const lines = rawOutput.split("\n");
+    const blocks = [];
+    let current = null;
+
+    for (const line of lines) {
+        const match = line.match(hostBlockPattern);
+        if (match) {
+            if (current) blocks.push(current);
+            current = { status: match[2], lines: [line] };
+        } else if (current) {
+            current.lines.push(line);
+        } else {
+            blocks.push({ status: null, lines: [line] });
+        }
+    }
+    if (current) blocks.push(current);
+
+    return blocks.map(block => {
+        const text = block.lines.join("\n");
+        const cssClass = block.status === "SUCCESS" ? "log-success"
+            : (block.status === "UNREACHABLE!" || block.status === "FAILED!") ? "log-error"
+            : "";
+        return `<pre class="${cssClass}" style="white-space:pre-wrap; margin:6px 0; font-family:inherit;">${escapeHtml(text)}</pre>`;
+    }).join("");
+}
+
+async function testInstallConnectivity() {
+    const payload = {
+        server_ip: document.getElementById("server_ip").value.trim(),
+        ssh_user: document.getElementById("ssh_user").value.trim(),
+        ssh_password: document.getElementById("ssh_password").value
+    };
+
+    const statusEl = document.getElementById("connectivity-status");
+    const btn = document.getElementById("test-connectivity-btn");
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Testing...`;
+    statusEl.hidden = false;
+    statusEl.className = "connection-status";
+    statusEl.textContent = "Checking SSH connectivity...";
+
+    try {
+        const response = await fetch("/api/install-test-connection", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+
+        statusEl.className = "connection-status";
+        statusEl.innerHTML = `<div>${escapeHtml(result.message)}</div>` + formatPingOutput(result.output || "");
+    } catch (error) {
+        console.error(error);
+        statusEl.className = "connection-status log-error";
+        statusEl.textContent = "Could not reach the backend to run the connectivity check.";
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-plug-circle-check"></i> Test Connectivity`;
+    }
+}
+
 function setInstallButtonState(installing) {
     const btn = document.getElementById("install-btn");
     if (!btn) return;
