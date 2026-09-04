@@ -44,8 +44,7 @@ SUMMARY_FILE = "/tmp/postgres_summary.json"
 
 # Same path the /api/deployment/log route reads from — must match exactly
 # so what's streamed here is what the UI polls.
-ANSIBLE_LOG =  BACKEND_DIR / "logs"
-
+ANSIBLE_LOG = BACKEND_DIR / "logs" / "ansible.log"
 
 def run_playbook_live(playbook_name, label):
     """
